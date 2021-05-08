@@ -112,7 +112,7 @@ class UploadedFile implements UploadedFileInterface
         $this->validateActive();
 
         if (!is_string($targetPath) || $targetPath === '') {
-            throw new InvalidArgumentException('Invalid path provided for move operation');
+            throw new InvalidArgumentException('Invalid path provided for move operation.');
         }
 
         $uri = $this->stream->getMetadata('uri');
@@ -122,7 +122,7 @@ class UploadedFile implements UploadedFileInterface
             : @move_uploaded_file($uri, $targetPath);
 
         if (!$moved) {
-            throw new RuntimeException('UploadedFile move failed');
+            throw new RuntimeException('UploadedFile move failed.');
         }
 
         $this->moved = true;
@@ -197,7 +197,7 @@ class UploadedFile implements UploadedFileInterface
     private function setError(int $error)
     {
         if (!isset(self::$errorHash[$error])) {
-            throw new InvalidArgumentException('Invalid error status for UploadedFile');
+            throw new InvalidArgumentException('Invalid error status for UploadedFile.');
         }
 
         $this->error = $error;
@@ -255,11 +255,11 @@ class UploadedFile implements UploadedFileInterface
     private function validateActive()
     {
         if (!$this->isOk()) {
-            throw new RuntimeException('Cannot retrieve stream due to upload error');
+            throw new RuntimeException('Cannot retrieve stream due to upload error.');
         }
 
         if ($this->isMoved()) {
-            throw new RuntimeException('Cannot retrieve stream after it has already been moved');
+            throw new RuntimeException('Cannot retrieve stream after it has already been moved.');
         }
     }
 }

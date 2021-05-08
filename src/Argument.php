@@ -63,7 +63,7 @@ class Argument
      *
      * @var string[]
      */
-    protected static array $declarations = [
+    private static array $declarations = [
         self::NULL => 'null',
         self::BOOL => 'a boolean',
         self::INT => 'an integer',
@@ -175,6 +175,6 @@ class Argument
      */
     public static function exception(string $name, string $declaration): InvalidArgumentException
     {
-        return new InvalidArgumentException(sprintf('%s must be %s', $name, $declaration));
+        return new InvalidArgumentException(sprintf('%s must be %s.', $name, $declaration));
     }
 }

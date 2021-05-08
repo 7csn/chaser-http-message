@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace chaser\http\message;
 
-use chaser\http\message\traits\MessageTrait;
 use InvalidArgumentException;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\StreamInterface;
@@ -17,7 +16,7 @@ use Psr\Http\Message\UriInterface;
  */
 class Request implements RequestInterface
 {
-    use MessageTrait;
+    use Message;
 
     /**
      * 可用请求方法
@@ -77,6 +76,11 @@ class Request implements RequestInterface
         $this->setMethod($method)->setUri($uri, $this->hasHeader('Host'));
     }
 
+    /**
+     * 返回消息请求目标
+     *
+     * @return string
+     */
     public function getRequestTarget(): string
     {
         if ($this->target === null) {
@@ -97,6 +101,12 @@ class Request implements RequestInterface
         return $this->target;
     }
 
+    /**
+     * 返回具有特定请求目标的实例
+     *
+     * @param mixed $requestTarget
+     * @return static
+     */
     public function withRequestTarget($requestTarget)
     {
         if ($this->target === $requestTarget) {
@@ -108,6 +118,11 @@ class Request implements RequestInterface
         return $new;
     }
 
+    /**
+     * 返回请求的 HTTP 方法
+     *
+     * @return string
+     */
     public function getMethod(): string
     {
         return $this->method;
@@ -154,7 +169,7 @@ class Request implements RequestInterface
     private function setMethod(string $method): self
     {
         if ($this->isMethodInvalid($method)) {
-            throw new InvalidArgumentException('Invalid path provided for request');
+            throw new InvalidArgumentException('Invalid path provided for request.');
         }
 
         $this->method = $method;

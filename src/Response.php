@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace chaser\http\message;
 
-use chaser\http\message\traits\MessageTrait;
 use InvalidArgumentException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
@@ -13,16 +12,10 @@ use Psr\Http\Message\StreamInterface;
  * http 服务器响应
  *
  * @package chaser\http\message
- *
- * @method static withProtocolVersion($version)
- * @method static withHeader($name, $value)
- * @method static withAddedHeader($name, $value)
- * @method static withoutHeader($name)
- * @method static withBody(StreamInterface $body)
  */
 class Response implements ResponseInterface
 {
-    use MessageTrait;
+    use Message;
 
     /**
      * 状态码说明
@@ -105,6 +98,20 @@ class Response implements ResponseInterface
     protected string $reasonPhrase = '';
 
     /**
+     * 编码
+     *
+     * @var string
+     */
+    protected string $charset = 'utf-8';
+
+    /**
+     * cookie
+     *
+     * @var string[]
+     */
+    protected array $cookies = [];
+
+    /**
      * 初始化消息数据
      *
      * @param int|null $code
@@ -170,13 +177,118 @@ class Response implements ResponseInterface
     }
 
     /**
+     * 返回具有指定编码的实例
+     *
+     * @param string $charset
+     * @return self
+     */
+    public function withCharset(string $charset): self
+    {
+        if ($this->charset === $charset) {
+            return $this;
+        }
+
+        $new = clone $this;
+        $new->charset = $charset;
+
+        return $new;
+    }
+
+    /**
+     * 返回具有指定 cookie 的实例
+     *
+     * @param string $name
+     * @param string $value
+     * @param int $maxAge
+     * @param string $path
+     * @param string $domain
+     * @param bool $secure
+     * @param bool $httpOnly
+     * @param bool $raw
+     * @param string|null $sameSite
+     * @return self
+     */
+    public function withCookie(
+        string $name,
+        string $value = '',
+        int $maxAge = 0,
+        string $path = '',
+        string $domain = '',
+        bool $secure = false,
+        bool $httpOnly = true,
+        bool $raw = false,
+        ?string $sameSite = null
+    ): self
+    {
+        if (preg_match("/[=,; \t\r\n\013\014]/", $name)) {
+            throw new InvalidArgumentException(sprintf('The cookie name "%s" contains invalid characters.', $name));
+        }
+
+        if (empty($name)) {
+            throw new InvalidArgumentException('The cookie name cannot be empty.');
+        }
+
+        if (!in_array($sameSite, ['lax', 'strict', null], true)) {
+            throw new InvalidArgumentException('The "sameSite" parameter value is not valid.');
+        }
+
+        if (!$raw) {
+            $name = urlencode($name);
+            $value = rawurlencode($value);
+        }
+
+        $time = time();
+        $maxAge = max(0, $maxAge);
+
+        if ($value === '') {
+            $cookie[] = sprintf('%s=%s', $name, 'deleted');
+            $cookie[] = sprintf('Expires=%s', gmdate('D, d-M-Y H:i:s T', $time - 31536001));
+            $cookie[] = 'Max-Age=-31536001';
+        } else {
+            $cookie[] = sprintf('%s=%s', $name, $value);
+            if ($maxAge > 0) {
+                $cookie[] = sprintf('Expires=%s', gmdate('D, d-M-Y H:i:s T', $time + $maxAge));
+                $cookie[] = sprintf('Max-Age=%d', $maxAge);
+            }
+        }
+
+        $cookie[] = sprintf('Path=%s', $path ?: '/');
+
+        if ($domain !== '') {
+            $cookie[] = sprintf('Domain=%s', $domain);
+        }
+
+        if ($secure) {
+            $cookie[] = 'Secure';
+        }
+
+        if ($httpOnly) {
+            $cookie[] = 'Httponly';
+        }
+
+        if ($sameSite !== null) {
+            $cookie[] = sprintf('SameSite=%s', ucfirst($sameSite));
+        }
+
+        $new = clone $this;
+        $new->cookies[$name] = $cookie;
+        return $new;
+    }
+
+    /**
      * 字符串化
      *
      * @return string
      */
     public function __toString(): string
     {
-        return '';
+        $this->withHeader('Date', gmdate('D, d-M-Y H:i:s T'));
+        $this->withHeader('Content-Length', $this->body->getSize());
+
+        $headers = $this->getHeaderLines();
+        array_unshift($headers, $this->getStatusLine(), $this->getCookieLines());
+
+        return sprintf("%s\r\n\r\n%s", join("\r\n", $headers), (string)$this->body);
     }
 
     /**
@@ -189,7 +301,7 @@ class Response implements ResponseInterface
     private function setStatus(int $code, string $reasonPhrase = ''): self
     {
         if (!isset(self::PHRASES[$code])) {
-            throw new InvalidArgumentException('Invalid status code provided for response');
+            throw new InvalidArgumentException('Invalid status code provided for response.');
         }
 
         $this->statusCode = $code;
@@ -197,5 +309,43 @@ class Response implements ResponseInterface
         $this->reasonPhrase = $reasonPhrase === '' ? self::PHRASES[$code] : $reasonPhrase;
 
         return $this;
+    }
+
+    /**
+     * 获取状态行
+     *
+     * @return string
+     */
+    private function getStatusLine(): string
+    {
+        return sprintf('HTTP/%s %d %s', $this->protocolVersion, $this->getStatusCode(), $this->getReasonPhrase());
+    }
+
+    /**
+     * 返回消息头串列表
+     *
+     * @return string[]
+     */
+    private function getHeaderLines(): array
+    {
+        $headers = [];
+        foreach ($this->headers as $name => $values) {
+            $headers[] = sprintf('%s: %s', $name, join('; ', $values));
+        }
+        return $headers;
+    }
+
+    /**
+     * 返回 cookie 列表
+     *
+     * @return string[]
+     */
+    private function getCookieLines(): array
+    {
+        $cookies = [];
+        foreach ($this->cookies as $cookie) {
+            $cookies[] = sprintf('Set-Cookie: %s', $cookie);
+        }
+        return $cookies;
     }
 }

@@ -75,6 +75,43 @@ class Stream implements StreamInterface
     protected bool $writable;
 
     /**
+     * 从字符串创建新流
+     *
+     * @param string $content
+     * @return Stream
+     */
+    public static function create(string $content = ''): Stream
+    {
+        $resource = fopen('php://temp', 'rw+');
+        fwrite($resource, $content);
+        return new self($resource);
+    }
+
+    /**
+     * 从现有文件创建流
+     *
+     * @param string $filename
+     * @param string $mode
+     * @return Stream
+     */
+    public static function createFormFile(string $filename, string $mode = 'r'): Stream
+    {
+        if ($mode === '' || strpos('rwaxc', $mode[0]) === false) {
+            throw new InvalidArgumentException(sprintf('The mode %s is invalid.', $mode));
+        }
+
+        if ($filename === '') {
+            throw new RuntimeException('Filename cannot be empty.');
+        }
+
+        if (false === $resource = @fopen($filename, $mode)) {
+            throw new RuntimeException(sprintf('The file "%s" cannot be opened.', $filename));
+        }
+
+        return new self($resource);
+    }
+
+    /**
      * 初始化流信息
      *
      * @param resource $stream
@@ -82,7 +119,7 @@ class Stream implements StreamInterface
     public function __construct($stream)
     {
         if (!is_resource($stream)) {
-            throw new InvalidArgumentException('Stream must be a resource');
+            throw new InvalidArgumentException('Stream must be a resource.');
         }
 
         $this->stream = $stream;
@@ -105,7 +142,7 @@ class Stream implements StreamInterface
             if ($this->isSeekable()) {
                 $this->rewind();
             }
-            return $this->getContent();
+            return $this->getContents();
         } catch (RuntimeException $e) {
             return '';
         }
@@ -173,7 +210,7 @@ class Stream implements StreamInterface
     public function tell(): int
     {
         if (false === $tell = ftell($this->stream)) {
-            throw new RuntimeException('Unable to determine stream position');
+            throw new RuntimeException('Unable to determine stream position.');
         }
         return $tell;
     }
@@ -206,11 +243,11 @@ class Stream implements StreamInterface
     public function seek($offset, $whence = SEEK_SET)
     {
         if (!$this->isSeekable()) {
-            throw new RuntimeException('Stream is not seekable');
+            throw new RuntimeException('Stream is not seekable.');
         }
 
         if (fseek($this->stream, $offset, $whence) === -1) {
-            throw new RuntimeException('Unable to seek to stream position ' . $offset . ' with whence ' . (string)$whence);
+            throw new RuntimeException(sprintf('Unable to seek to stream position "%d" with whence "%d".', $offset, $whence));
         }
     }
 
@@ -242,13 +279,13 @@ class Stream implements StreamInterface
     public function write($string): int
     {
         if (!$this->isWritable()) {
-            throw new RuntimeException('Cannot write to a non-writable stream');
+            throw new RuntimeException('Cannot write to a non-writable stream.');
         }
 
         $this->size = null;
 
         if (false === $write = fwrite($this->stream, $string)) {
-            throw new RuntimeException('Unable to write to stream');
+            throw new RuntimeException('Unable to write to stream.');
         }
 
         return $write;
@@ -274,7 +311,7 @@ class Stream implements StreamInterface
         if ($this->isReadable()) {
             return fread($this->stream, $length);
         }
-        throw new RuntimeException('Cannot read to a unreadable stream');
+        throw new RuntimeException('Cannot read to a unreadable stream.');
     }
 
     /**
@@ -282,7 +319,7 @@ class Stream implements StreamInterface
      *
      * @inheritDoc
      */
-    public function getContent(): string
+    public function getContents(): string
     {
         if (isset($this->stream)) {
             $content = stream_get_contents($this->stream);
@@ -290,7 +327,7 @@ class Stream implements StreamInterface
                 return $content;
             }
         }
-        throw new RuntimeException('Unable to read stream contents');
+        throw new RuntimeException('Unable to read stream contents.');
     }
 
     /**

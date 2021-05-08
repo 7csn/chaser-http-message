@@ -90,7 +90,7 @@ class Uri implements UriInterface
             if ($components) {
                 $this->components = $components;
             } else {
-                throw new InvalidArgumentException("Unable to parse URI: {$url}");
+                throw new InvalidArgumentException(sprintf('Unable to parse URI: %s.', $url));
             }
         }
     }
@@ -280,7 +280,7 @@ class Uri implements UriInterface
     /**
      * @inheritDoc
      */
-    public function __toString()
+    public function __toString(): string
     {
         $url = '';
 
@@ -324,24 +324,6 @@ class Uri implements UriInterface
             return $component;
         }
         return $default;
-    }
-
-    /**
-     * 设置组件值
-     *
-     * @param string $name
-     * @param mixed $value
-     * @return $this
-     */
-    protected function setComponent(string $name, $value): self
-    {
-        if (empty($value)) {
-            unset($this->components[$name]);
-        } else {
-            $this->components[$name] = $value;
-        }
-
-        return $this;
     }
 
     /**
