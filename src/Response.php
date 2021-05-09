@@ -173,7 +173,7 @@ class Response implements ResponseInterface
 
     public function getReasonPhrase(): string
     {
-        return $this->reasonPhrase ??= self::PHRASES[$this->statusCode] ?? '';
+        return $this->reasonPhrase ?: self::PHRASES[$this->statusCode] ?? '';
     }
 
     /**
