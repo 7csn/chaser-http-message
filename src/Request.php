@@ -42,9 +42,9 @@ class Request implements RequestInterface
     /**
      * 请求目标
      *
-     * @var string
+     * @var string|null
      */
-    protected string $target;
+    protected ?string $target = null;
 
     /**
      * 初始化请求信息
