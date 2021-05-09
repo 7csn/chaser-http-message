@@ -161,6 +161,7 @@ class Argument
      */
     public static function validate(string $name, $value, int $type)
     {
+        $declarations = [];
         if (self::invalid($value, $type, $declarations)) {
             throw self::exception($name, join(' or ', $declarations));
         }
