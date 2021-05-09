@@ -226,6 +226,6 @@ class Request implements RequestInterface
      */
     private function isMethodInvalid(string $method): bool
     {
-        return in_array($method, self::ALLOW_METHODS);
+        return in_array($method, self::ALLOW_METHODS) === false;
     }
 }
