@@ -284,11 +284,12 @@ class Response implements ResponseInterface
     {
         $body = $this->getBody();
 
-        $this->withHeader('Date', gmdate('D, d-M-Y H:i:s T'));
-        $this->withHeader('Content-Length', (string)$body->getSize() ?: '0');
+        $new = $this
+            ->withHeader('Date', gmdate('D, d-M-Y H:i:s T'))
+            ->withHeader('Content-Length', (string)$body->getSize() ?: '0');
 
-        $headers = $this->getHeaderLines();
-        array_unshift($headers, $this->getStatusLine(), ...$this->getCookieLines());
+        $headers = $new->getHeaderLines();
+        array_unshift($headers, $new->getStatusLine(), ...$new->getCookieLines());
 
         return sprintf("%s\r\n\r\n%s", join("\r\n", $headers), (string)$body);
     }

@@ -93,7 +93,12 @@ trait Message
     public function getHeader($name): array
     {
         $name = strtolower($name);
-        return isset($this->headerNames[$name]) ? $this->headers[$this->headerNames[$name]] : [];
+
+        if (null === $saveName = $this->getHeaderNameByLowCaseName($name)) {
+            return [];
+        }
+
+        return $this->headers[$saveName];
     }
 
     /**
@@ -118,26 +123,13 @@ trait Message
     {
         Argument::validate('Header name', $name, Argument::STRING);
 
-        $value = self::normalizeHeaderValue($value);
-
-        $lowCaseName = strtolower($name);
-
-        $new = clone $this;
-
-        if (isset($new->headerNames[$lowCaseName])) {
-            unset ($new->headers[$new->headerNames[$lowCaseName]]);
-        }
-
-        $new->headerNames[$lowCaseName] = $name;
-        $new->headers[$name] = $value;
-
-        return $new;
+        return (clone $this)->setHeader($name, $value);
     }
 
     /**
      * 返回附加指定消息头的实例
      *
-     * @param $name
+     * @param string $name
      * @param string|string[] $value
      * @return static
      */
@@ -145,7 +137,7 @@ trait Message
     {
         Argument::validate('Header name', $name, Argument::STRING);
 
-        return (clone $this)->setHeader($name, $value);
+        return (clone $this)->addHeader($name, $value);
     }
 
     /**
@@ -156,15 +148,11 @@ trait Message
      */
     public function withoutHeader($name)
     {
+        Argument::validate('Header name', $name, Argument::STRING);
+
         $lowCaseName = strtolower($name);
 
-        if (!isset($this->headerNames[$lowCaseName])) {
-            return $this;
-        }
-
-        $new = clone $this;
-        unset($new->headers[$new->headerNames[$lowCaseName]], $new->headerNames[$lowCaseName]);
-        return $new;
+        return isset($this->headerNames[$lowCaseName]) ? (clone $this)->delHeaderByLowCaseName($lowCaseName) : $this;
     }
 
     /**
@@ -201,6 +189,17 @@ trait Message
     }
 
     /**
+     * 通过小写名获取当前消息头名
+     *
+     * @param string $name
+     * @return string|null
+     */
+    private function getHeaderNameByLowCaseName(string $name): ?string
+    {
+        return $this->headerNames[$name] ?? null;
+    }
+
+    /**
      * 批量修改消息头
      *
      * @param array $headers
@@ -227,12 +226,52 @@ trait Message
 
         $lowCaseName = strtolower($name);
 
-        if (isset($this->headerNames[$lowCaseName])) {
-            $name = $this->headerNames[$lowCaseName];
-            $this->headers[$name] = array_merge($this->headers[$name], $value);
-        } else {
+        $saveName = $this->getHeaderNameByLowCaseName($lowCaseName);
+
+        if ($saveName !== $name) {
+            $this->headerNames[$lowCaseName] = $name;
+        }
+
+        $this->headers[$name] = $value;
+
+        return $this;
+    }
+
+    /**
+     * 添加指定消息头
+     *
+     * @param string $name
+     * @param string|string[] $value
+     * @return $this
+     */
+    private function addHeader(string $name, $value): self
+    {
+        $value = self::normalizeHeaderValue($value);
+
+        $lowCaseName = strtolower($name);
+
+        $saveName = $this->getHeaderNameByLowCaseName($lowCaseName);
+
+        if ($saveName === null) {
             $this->headerNames[$lowCaseName] = $name;
             $this->headers[$name] = $value;
+        } else {
+            $this->headers[$name] = array_merge($this->headers[$saveName], $value);
+        }
+
+        return $this;
+    }
+
+    /**
+     * 通过小写名删除消息头
+     *
+     * @param string $name
+     * @return $this
+     */
+    private function delHeaderByLowCaseName(string $name): self
+    {
+        if (null !== $saveName = $this->getHeaderNameByLowCaseName($name)) {
+            unset($this->headers[$saveName], $this->headerNames[$name]);
         }
 
         return $this;
@@ -251,7 +290,7 @@ trait Message
     }
 
     /**
-     * 剔除头部值数组元素中的空格及制表符（验证非空字符串）
+     * 头部值视为字符串数组（验证非空），剔除元素空格及制表符
      *
      * @param mixed $value
      * @return string[]
@@ -269,10 +308,7 @@ trait Message
         }
 
         return array_map(function ($value) {
-            if (is_string($value)) {
-                return trim($value, " \t");
-            }
-            throw new InvalidArgumentException('Header value must be an array of non empty strings.');
+            return trim((string)$value, " \t");
         }, $values);
     }
 }
