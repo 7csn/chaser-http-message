@@ -1,24 +1,21 @@
 <?php
 
-declare(strict_types=1);
-
 namespace chaser\http\message;
 
+use chaser\utils\validation\Type;
 use InvalidArgumentException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 
 /**
- * http 服务器响应
+ * http 服务端响应类
  *
  * @package chaser\http\message
  */
-class Response implements ResponseInterface
+class Response extends Message implements ResponseInterface
 {
-    use Message;
-
     /**
-     * 状态码说明
+     * 状态码说明对照表
      *
      * @var string[]
      */
@@ -88,41 +85,35 @@ class Response implements ResponseInterface
      *
      * @var int
      */
-    protected int $statusCode = 200;
+    private int $statusCode;
 
     /**
-     * 原因短语
+     * 与状态码关联的原因短语
      *
      * @var string
      */
-    protected string $reasonPhrase = '';
+    private string $reasonPhrase;
 
     /**
-     * 编码
-     *
-     * @var string
-     */
-    protected string $charset = 'utf-8';
-
-    /**
-     * cookie
+     * cookie 列表
      *
      * @var string[]
      */
-    protected array $cookies = [];
+    private array $cookies = [];
 
     /**
-     * 初始化消息数据
+     * 初始化响应信息
      *
-     * @param int|null $code
-     * @param string|null $reasonPhrase
+     * @param int $statusCode
+     * @param string $reasonPhrase
      * @param array|null $headers
      * @param StreamInterface|null $body
      * @param string|null $protocolVersion
+     * @throws InvalidArgumentException
      */
     public function __construct(
-        int $code = null,
-        string $reasonPhrase = null,
+        int $statusCode = 200,
+        string $reasonPhrase = '',
         array $headers = null,
         StreamInterface $body = null,
         string $protocolVersion = null
@@ -137,29 +128,38 @@ class Response implements ResponseInterface
         if ($protocolVersion !== null) {
             $this->setProtocolVersion($protocolVersion);
         }
-        if ($code !== null) {
-            $this->setStatus($code, $reasonPhrase ?? '');
-        }
+        $this->setStatus($statusCode, $reasonPhrase);
     }
 
+    /**
+     * 获取响应状态码
+     *
+     * @return int
+     */
     public function getStatusCode(): int
     {
         return $this->statusCode;
     }
 
-    public function withStatus($code, $reasonPhrase = '')
+    /**
+     * 返回具有指定状态码和原因短语的实例
+     *
+     * @param int $code
+     * @param string $reasonPhrase
+     * @return static
+     * @throws InvalidArgumentException
+     */
+    public function withStatus($code, $reasonPhrase = ''): self
     {
-        Argument::validate('Code', $code, Argument::INT);
-        Argument::validate('Reason phrase', $reasonPhrase, Argument::STRING);
+        Type::validate('Status code', $code, Type::INT);
+
+        $reasonPhrase = (string)$reasonPhrase;
 
         if ($this->statusCode === $code) {
-
-            // 状态码和描述一致不修改
             if ($this->reasonPhrase === $reasonPhrase) {
                 return $this;
             }
 
-            // 状态码一致，描述为空，原描述为标准描述则不修改
             if ($reasonPhrase === '' && isset(self::PHRASES[$code])) {
                 $reasonPhrase = self::PHRASES[$code];
                 if ($reasonPhrase === $this->reasonPhrase) {
@@ -169,29 +169,17 @@ class Response implements ResponseInterface
         }
 
         return (clone $this)->setStatus($code, $reasonPhrase);
-    }
 
-    public function getReasonPhrase(): string
-    {
-        return $this->reasonPhrase ?: self::PHRASES[$this->statusCode] ?? '';
     }
 
     /**
-     * 返回具有指定编码的实例
+     * 获取与状态码关联的原因短语
      *
-     * @param string $charset
-     * @return self
+     * @return string
      */
-    public function withCharset(string $charset): self
+    public function getReasonPhrase(): string
     {
-        if ($this->charset === $charset) {
-            return $this;
-        }
-
-        $new = clone $this;
-        $new->charset = $charset;
-
-        return $new;
+        return $this->reasonPhrase ?: self::PHRASES[$this->statusCode] ?? '';
     }
 
     /**
@@ -206,7 +194,7 @@ class Response implements ResponseInterface
      * @param bool $httpOnly
      * @param bool $raw
      * @param string|null $sameSite
-     * @return self
+     * @return static
      */
     public function withCookie(
         string $name,
@@ -240,39 +228,43 @@ class Response implements ResponseInterface
         $time = time();
         $maxAge = max(0, $maxAge);
 
+        $cookie = '';
+
         if ($value === '') {
-            $cookie[] = sprintf('%s=%s', $name, 'deleted');
-            $cookie[] = sprintf('Expires=%s', gmdate('D, d-M-Y H:i:s T', $time - 31536001));
-            $cookie[] = 'Max-Age=-31536001';
+            $cookie .= sprintf('%s=%s', $name, 'deleted');
+            $cookie .= sprintf('; Expires=%s', gmdate('D, d-M-Y H:i:s T', $time - 31536001));
+            $cookie .= '; Max-Age=-31536001';
         } else {
-            $cookie[] = sprintf('%s=%s', $name, $value);
+            $cookie .= sprintf('%s=%s', $name, $value);
             if ($maxAge > 0) {
-                $cookie[] = sprintf('Expires=%s', gmdate('D, d-M-Y H:i:s T', $time + $maxAge));
-                $cookie[] = sprintf('Max-Age=%d', $maxAge);
+                $cookie .= sprintf('; Expires=%s', gmdate('D, d-M-Y H:i:s T', $time + $maxAge));
+                $cookie .= sprintf('; Max-Age=%d', $maxAge);
             }
         }
 
-        $cookie[] = sprintf('Path=%s', $path ?: '/');
+        $cookie .= sprintf('; Path=%s', $path ?: '/');
 
         if ($domain !== '') {
-            $cookie[] = sprintf('Domain=%s', $domain);
+            $cookie .= sprintf('; Domain=%s', $domain);
         }
 
         if ($secure) {
-            $cookie[] = 'Secure';
+            $cookie .= '; Secure';
         }
 
         if ($httpOnly) {
-            $cookie[] = 'Httponly';
+            $cookie .= '; Httponly';
         }
 
         if ($sameSite !== null) {
-            $cookie[] = sprintf('SameSite=%s', ucfirst($sameSite));
+            $cookie .= sprintf('; SameSite=%s', ucfirst($sameSite));
         }
 
-        $new = clone $this;
-        $new->cookies[$name] = $cookie;
-        return $new;
+        if (isset($this->cookies[$name]) && $this->cookies[$name] === $cookie) {
+            return $this;
+        }
+
+        return (clone $this)->setCookie($name, $cookie);
     }
 
     /**
@@ -303,14 +295,26 @@ class Response implements ResponseInterface
      */
     private function setStatus(int $code, string $reasonPhrase = ''): self
     {
-        if (!isset(self::PHRASES[$code])) {
+        if (100 < $code || $code >= 600) {
             throw new InvalidArgumentException('Invalid status code provided for response.');
         }
 
         $this->statusCode = $code;
+        $this->reasonPhrase = $reasonPhrase;
 
-        $this->reasonPhrase = $reasonPhrase === '' ? self::PHRASES[$code] : $reasonPhrase;
+        return $this;
+    }
 
+    /**
+     * 设置 cookie
+     *
+     * @param string $name
+     * @param string $cookie
+     * @return $this
+     */
+    private function setCookie(string $name, string $cookie): self
+    {
+        $this->cookies[$name] = $cookie;
         return $this;
     }
 
@@ -321,7 +325,7 @@ class Response implements ResponseInterface
      */
     private function getStatusLine(): string
     {
-        return sprintf('HTTP/%s %d %s', $this->protocolVersion, $this->getStatusCode(), $this->getReasonPhrase());
+        return sprintf('HTTP/%s %d %s', $this->getProtocolVersion(), $this->getStatusCode(), $this->getReasonPhrase());
     }
 
     /**
@@ -332,8 +336,8 @@ class Response implements ResponseInterface
     private function getHeaderLines(): array
     {
         $headers = [];
-        foreach ($this->headers as $name => $values) {
-            $headers[] = sprintf('%s: %s', $name, join('; ', $values));
+        foreach ($this->getHeaders() as $name => $values) {
+            $headers[] = sprintf('%s: %s', $name, join(', ', $values));
         }
         return $headers;
     }

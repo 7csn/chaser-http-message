@@ -3,8 +3,9 @@
   "description": "http 消息，包含 http 请求响应及其组件。",
   "type": "library",
   "require": {
-    "php": ">=7.4.0",
-    "psr/http-message": "^1.0"
+    "php": ">=7.4",
+    "psr/http-message": "^1.0",
+    "7csn/utils-validation-type": "^1.0"
   },
   "license": "MIT",
   "authors": [

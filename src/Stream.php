@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace chaser\http\message;
 
 use InvalidArgumentException;
@@ -9,7 +7,7 @@ use Psr\Http\Message\StreamInterface;
 use RuntimeException;
 
 /**
- * 数据流
+ * 文本流类
  *
  * @package chaser\http\message
  */
@@ -124,10 +122,6 @@ class Stream implements StreamInterface
 
         $this->stream = $stream;
 
-        if (fseek($this->stream, 0, SEEK_CUR) === -1) {
-            $this->seekable = false;
-        }
-
         $this->uri = $this->getMetadata('uri');
     }
 
@@ -164,15 +158,16 @@ class Stream implements StreamInterface
     }
 
     /**
-     * 分离底层资源
+     * 分离底层资源，之后流不可用
      *
      * @return resource|null
      */
     public function detach()
     {
         if (isset($this->stream)) {
-            $this->size = null;
+            $this->meta = null;
             $this->uri = null;
+            $this->size = null;
             $this->seekable = false;
             $this->readable = false;
             $this->writable = false;
@@ -203,9 +198,10 @@ class Stream implements StreamInterface
     }
 
     /**
-     * 返回流指针计数
+     * 返回指针位置
      *
-     * @inheritDoc
+     * @return int
+     * @throws RuntimeException
      */
     public function tell(): int
     {
@@ -232,13 +228,15 @@ class Stream implements StreamInterface
      */
     public function isSeekable()
     {
-        return $this->seekable ??= $this->getMetadata('seekable');
+        return $this->seekable ??= $this->getMetadata('seekable') && fseek($this->stream, 0, SEEK_CUR) === 0;
     }
 
     /**
      * 移动指针
      *
-     * @inheritDoc
+     * @param int $offset
+     * @param int $whence
+     * @throws RuntimeException
      */
     public function seek($offset, $whence = SEEK_SET)
     {
@@ -254,7 +252,7 @@ class Stream implements StreamInterface
     /**
      * 指针指向流的开头
      *
-     * @inheritDoc
+     * @throws RuntimeException
      */
     public function rewind(): void
     {
@@ -274,7 +272,9 @@ class Stream implements StreamInterface
     /**
      * 将数据写入流
      *
-     * @inheritDoc
+     * @param string $string
+     * @return int
+     * @throws RuntimeException
      */
     public function write($string): int
     {
@@ -304,7 +304,9 @@ class Stream implements StreamInterface
     /**
      * 从流中读取数据
      *
-     * @inheritDoc
+     * @param int $length
+     * @return string
+     * @throws RuntimeException
      */
     public function read($length): string
     {
@@ -317,7 +319,8 @@ class Stream implements StreamInterface
     /**
      * 读取剩余内容
      *
-     * @inheritDoc
+     * @return string
+     * @throws RuntimeException
      */
     public function getContents(): string
     {
@@ -333,7 +336,8 @@ class Stream implements StreamInterface
     /**
      * 获取流元素据数组或指定元素据
      *
-     * @inheritDoc
+     * @param string|null $key
+     * @return array|mixed|null
      */
     public function getMetadata($key = null)
     {

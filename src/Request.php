@@ -10,14 +10,12 @@ use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\UriInterface;
 
 /**
- * http 客户端请求
+ * http 客户端请求类
  *
  * @package chaser\http\message
  */
-class Request implements RequestInterface
+class Request extends Message implements RequestInterface
 {
-    use Message;
-
     /**
      * 可用请求方法
      *
@@ -30,21 +28,21 @@ class Request implements RequestInterface
      *
      * @var UriInterface
      */
-    protected UriInterface $uri;
+    private UriInterface $uri;
 
     /**
      * 请求方法类型
      *
      * @var string
      */
-    protected string $method;
+    private string $method;
 
     /**
      * 请求目标
      *
      * @var string|null
      */
-    protected ?string $target = null;
+    private ?string $target = null;
 
     /**
      * 初始化请求信息
@@ -77,22 +75,19 @@ class Request implements RequestInterface
     }
 
     /**
-     * 返回消息请求目标
+     * 检索消息的请求目标
      *
      * @return string
      */
     public function getRequestTarget(): string
     {
         if ($this->target === null) {
-
             $this->target = $this->uri->getPath() ?: '/';
 
-            $query = $this->uri->getQuery();
-
-            if ($query !== '') {
+            if ('' !== $query = $this->uri->getQuery()) {
                 $this->target .= '?' . $query;
-                $fragment = $this->uri->getFragment();
-                if ($fragment !== '') {
+
+                if ('' !== $fragment = $this->uri->getFragment()) {
                     $this->target .= '#' . $fragment;
                 }
             }
@@ -107,7 +102,7 @@ class Request implements RequestInterface
      * @param mixed $requestTarget
      * @return static
      */
-    public function withRequestTarget($requestTarget)
+    public function withRequestTarget($requestTarget): self
     {
         if ($this->target === $requestTarget) {
             return $this;
@@ -128,7 +123,14 @@ class Request implements RequestInterface
         return $this->method;
     }
 
-    public function withMethod($method)
+    /**
+     * 返回具有指定请求方法的实例
+     *
+     * @param string $method
+     * @return static
+     * @throws InvalidArgumentException
+     */
+    public function withMethod($method): self
     {
         if (!is_string($method) || $method === '') {
             throw  new InvalidArgumentException('Method must be a non empty string');
@@ -137,16 +139,33 @@ class Request implements RequestInterface
         return $this->method === $method ? $this : (clone $this)->setMethod($method);
     }
 
+    /**
+     * 检索 URI
+     *
+     * @return UriInterface
+     */
     public function getUri(): UriInterface
     {
         return $this->uri;
     }
 
-    public function withUri(UriInterface $uri, $preserveHost = false)
+    /**
+     * 返回具有指定 URI 的实例
+     *
+     * @param UriInterface $uri
+     * @param bool $preserveHost
+     * @return static
+     */
+    public function withUri(UriInterface $uri, $preserveHost = false): self
     {
         return $this->uri === $uri ? $this : (clone $this)->setUri($uri, $preserveHost);
     }
 
+    /**
+     * 字符串化
+     *
+     * @return string
+     */
     public function __toString(): string
     {
         $requestLine = "{$this->getMethod()} {$this->getRequestTarget()} HTTP/{$this->getProtocolVersion()}";
@@ -196,26 +215,15 @@ class Request implements RequestInterface
      */
     private function setHostFromUri(): self
     {
-        $host = $this->uri->getHost();
-
-        if ($host !== '') {
-
-            $port = $this->uri->getPort();
-            if ($port !== null) {
-                $host .= ':' . $port;
-            }
-
-            if (isset($this->headerNames['host'])) {
-                $name = $this->headerNames['host'];
-            } else {
-                $this->headerNames['host'] = $name = 'Host';
-            }
-
-            // 将主机头信息排在最前
-            $this->headers = [$name => [$host]] + $this->headers;
+        if ('' === $host = $this->uri->getHost()) {
+            return $this;
         }
 
-        return $this;
+        if (null !== $port = $this->uri->getPort()) {
+            $host = sprintf('%s:%d', $host, $port);
+        }
+
+        return $this->setHeader('Host', $host);
     }
 
     /**

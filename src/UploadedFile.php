@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace chaser\http\message;
 
+use chaser\utils\validation\Type;
 use InvalidArgumentException;
 use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\UploadedFileInterface;
@@ -19,9 +20,9 @@ class UploadedFile implements UploadedFileInterface
     /**
      * 错误标识库
      *
-     * @var int[]
+     * @var bool[]
      */
-    protected static array $errorHash = [
+    private static array $errorHash = [
         UPLOAD_ERR_OK => true,
         UPLOAD_ERR_INI_SIZE => true,
         UPLOAD_ERR_FORM_SIZE => true,
@@ -37,42 +38,42 @@ class UploadedFile implements UploadedFileInterface
      *
      * @var StreamInterface|null
      */
-    protected ?StreamInterface $stream;
+    private ?StreamInterface $stream;
 
     /**
      * 文件字节数
      *
      * @var int|null
      */
-    protected ?int $size;
+    private ?int $size;
 
     /**
      * 错误标识
      *
      * @var int
      */
-    protected int $error;
+    private int $error;
 
     /**
      * 文件是否已移动
      *
      * @var bool
      */
-    protected bool $moved = false;
+    private bool $moved = false;
 
     /**
      * 客户端发出文件名
      *
      * @var string|null
      */
-    protected ?string $clientFilename;
+    private ?string $clientFilename;
 
     /**
      * 客户端发送的媒体类型
      *
      * @var string|null
      */
-    protected ?string $clientMediaType;
+    private ?string $clientMediaType;
 
     /**
      * 初始化上载文件信息
@@ -95,9 +96,12 @@ class UploadedFile implements UploadedFileInterface
     }
 
     /**
-     * @inheritDoc
+     * 检索上载文件流
+     *
+     * @return StreamInterface|null
+     * @throws RuntimeException
      */
-    public function getStream()
+    public function getStream(): ?StreamInterface
     {
         $this->validateActive();
 
@@ -105,9 +109,13 @@ class UploadedFile implements UploadedFileInterface
     }
 
     /**
-     * @inheritDoc
+     * 将上载文件移动到新路径
+     *
+     * @param string $targetPath
+     * @throws InvalidArgumentException
+     * @throws RuntimeException
      */
-    public function moveTo($targetPath)
+    public function moveTo($targetPath): void
     {
         $this->validateActive();
 
@@ -118,7 +126,9 @@ class UploadedFile implements UploadedFileInterface
         $uri = $this->stream->getMetadata('uri');
 
         $moved = PHP_SAPI === 'cli'
-            ? is_file($uri) ? @rename($uri, $targetPath) : file_put_contents($targetPath, (string)$this->stream)
+            ? is_file($uri)
+                ? @rename($uri, $targetPath)
+                : file_put_contents($targetPath, (string)$this->stream)
             : @move_uploaded_file($uri, $targetPath);
 
         if (!$moved) {
@@ -186,7 +196,7 @@ class UploadedFile implements UploadedFileInterface
      */
     private function setSize(?int $size)
     {
-        $this->size = $size === null ? $this->stream->getSize() : $size;
+        $this->size = $size ?? $this->stream->getSize();
     }
 
     /**
@@ -210,9 +220,9 @@ class UploadedFile implements UploadedFileInterface
      */
     private function setClientFilename(?string $clientFilename)
     {
-        if ($clientFilename !== null) {
-            $this->clientFilename = $clientFilename;
-        }
+        Type::validate('Upload file client filename', $clientFilename, Type::STRING | Type::NULL);
+
+        $this->clientFilename = $clientFilename;
     }
 
     /**
@@ -222,9 +232,9 @@ class UploadedFile implements UploadedFileInterface
      */
     private function setClientMediaType(?string $clientMediaType)
     {
-        if ($clientMediaType !== null) {
-            $this->clientMediaType = $clientMediaType;
-        }
+        Type::validate('Upload file client media type', $clientMediaType, Type::STRING | Type::NULL);
+
+        $this->clientMediaType = $clientMediaType;
     }
 
     /**
@@ -252,7 +262,7 @@ class UploadedFile implements UploadedFileInterface
      *
      * @throws RuntimeException
      */
-    private function validateActive()
+    private function validateActive(): void
     {
         if (!$this->isOk()) {
             throw new RuntimeException('Cannot retrieve stream due to upload error.');

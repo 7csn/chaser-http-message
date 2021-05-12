@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace chaser\http\message;
 
+use chaser\utils\validation\Type;
 use InvalidArgumentException;
 use Psr\Http\Message\UriInterface;
 
@@ -15,67 +16,67 @@ use Psr\Http\Message\UriInterface;
 class Uri implements UriInterface
 {
     /**
-     * 组件库
-     *
-     * @var array
-     */
-    protected array $components = [];
-
-    /**
      * 用户信息
      *
-     * @var string
+     * @var string|null
      */
-    protected string $userInfo;
+    private ?string $userInfo;
 
     /**
      * 授权信息
      *
-     * @var string
+     * @var string|null
      */
-    protected string $authority;
+    private ?string $authority;
 
     /**
      * 协议
      *
      * @var string
      */
-    protected string $scheme;
+    private string $scheme;
 
     /**
      * 主机名
      *
      * @var string
      */
-    protected string $host;
+    private string $host;
 
     /**
      * 端口号
      *
      * @var ?int
      */
-    protected ?int $port;
+    private ?int $port;
 
     /**
-     * 主路径
+     * 路径
      *
      * @var string
      */
-    protected string $path;
+    private string $path;
 
     /**
      * 查询字符串
      *
      * @var string
      */
-    protected string $query;
+    private string $query;
 
     /**
      * 片段
      *
      * @var string
      */
-    protected string $fragment;
+    private string $fragment;
+
+    /**
+     * 组件库
+     *
+     * @var array
+     */
+    private array $components = [];
 
     /**
      * 初始化请求路径
@@ -96,15 +97,19 @@ class Uri implements UriInterface
     }
 
     /**
-     * @inheritDoc
+     * 检索方案组件
+     *
+     * @return string
      */
     public function getScheme(): string
     {
-        return $this->scheme ??= $this->getComponent('scheme', '');
+        return $this->scheme ??= strtolower($this->getComponent('scheme', ''));
     }
 
     /**
-     * @inheritDoc
+     * 检索授权组件
+     *
+     * @return string
      */
     public function getAuthority(): string
     {
@@ -112,7 +117,9 @@ class Uri implements UriInterface
     }
 
     /**
-     * @inheritDoc
+     * 检索用户信息组件
+     *
+     * @return string
      */
     public function getUserInfo(): string
     {
@@ -120,7 +127,9 @@ class Uri implements UriInterface
     }
 
     /**
-     * @inheritDoc
+     * 检索主机组件
+     *
+     * @return string
      */
     public function getHost(): string
     {
@@ -128,7 +137,9 @@ class Uri implements UriInterface
     }
 
     /**
-     * @inheritDoc
+     * 获取端口组件
+     *
+     * @return int|null
      */
     public function getPort(): ?int
     {
@@ -136,7 +147,9 @@ class Uri implements UriInterface
     }
 
     /**
-     * @inheritDoc
+     * 检索路径组件
+     *
+     * @return string
      */
     public function getPath(): string
     {
@@ -144,7 +157,9 @@ class Uri implements UriInterface
     }
 
     /**
-     * @inheritDoc
+     * 检索查询字符串
+     *
+     * @return string
      */
     public function getQuery(): string
     {
@@ -152,7 +167,9 @@ class Uri implements UriInterface
     }
 
     /**
-     * @inheritDoc
+     * 检索片段组件
+     *
+     * @return string
      */
     public function getFragment(): string
     {
@@ -160,132 +177,116 @@ class Uri implements UriInterface
     }
 
     /**
-     * @inheritDoc
+     * 返回具有指定方案的实例
+     *
+     * @param string $scheme
+     * @return static
+     * @throws InvalidArgumentException
      */
-    public function withScheme($scheme)
+    public function withScheme($scheme): self
     {
-        if ($this->getScheme() === $scheme) {
-            return $this;
-        }
+        Type::validate('Scheme', $scheme, Type::STRING);
 
-        Argument::validate('Scheme', $scheme, Argument::STRING);
-
-        $new = clone $this;
-        $new->scheme = $scheme;
-        return $new;
+        return $this->getScheme() === $scheme ? $this : (clone $this)->setScheme($scheme);
     }
 
     /**
-     * @inheritDoc
+     * 返回具有指定用户信息的实例
+     *
+     * @param string $user
+     * @param string|null $password
+     * @return static
+     * @throws InvalidArgumentException
      */
-    public function withUserInfo($user, $password = null)
+    public function withUserInfo($user, $password = null): self
     {
-        Argument::validate('User', $user, Argument::STRING);
-        Argument::validate('Password', $password, Argument::NULL | Argument::STRING);
+        Type::validate('User', $user, Type::STRING);
+        Type::validate('Password', $password, Type::STRING | Type::NULL);
 
         $userInfo = self::makeUserInfo($user, $password);
 
-        if ($userInfo === $this->getUserInfo()) {
-            return $this;
-        }
-
-        $new = clone $this;
-        $this->userInfo = $userInfo;
-        $this->setAuthority();
-        return $new;
+        return $this->getUserInfo() === $userInfo ? $this : (clone $this)->setUserInfo($userInfo);
     }
 
     /**
-     * @inheritDoc
+     * 返回具有指定主机的实例
+     *
+     * @param string $host
+     * @return static
+     * @throws InvalidArgumentException
      */
-    public function withHost($host)
+    public function withHost($host): self
     {
-        if ($this->getHost() === $host) {
-            return $this;
-        }
+        Type::validate('Host', $host, Type::STRING);
 
-        Argument::validate('Host', $host, Argument::STRING);
-
-        $new = clone $this;
-        $new->host = $host;
-        $new->setAuthority();
-        return $new;
+        return $this->getHost() === $host ? $this : (clone $this)->setHost($host);
     }
 
     /**
-     * @inheritDoc
+     * 返回具有指定端口的实例
+     *
+     * @param int|null $port
+     * @return static
+     * @throws InvalidArgumentException
      */
-    public function withPort($port)
+    public function withPort($port): self
     {
-        if ($this->getPort() === $port) {
-            return $this;
-        }
+        Type::validate('Port', $port, Type::INT | Type::NULL);
 
-        Argument::validate('Port', $port, Argument::INT);
-
-        $new = clone $this;
-        $new->port = $port;
-        $new->setAuthority();
-        return $new;
+        return $this->getPort() === $port ? $this : (clone $this)->setPort($port);
     }
 
     /**
-     * @inheritDoc
+     * 返回具有指定路径的实例
+     *
+     * @param string $path
+     * @return static
+     * @throws InvalidArgumentException
      */
-    public function withPath($path)
+    public function withPath($path): self
     {
-        if ($this->getPath() === $path) {
-            return $this;
-        }
+        Type::validate('Path', $path, Type::STRING);
 
-        Argument::validate('Path', $path, Argument::STRING);
-
-        $new = clone $this;
-        $new->path = $path;
-        return $new;
+        return $this->getPath() === $path ? $this : (clone $this)->setPath($path);
     }
 
     /**
-     * @inheritDoc
+     * 返回具有指定查询字符串的实例
+     *
+     * @param string $query
+     * @return static
+     * @throws InvalidArgumentException
      */
-    public function withQuery($query)
+    public function withQuery($query): self
     {
-        if ($this->getQuery() === $query) {
-            return $this;
-        }
+        Type::validate('Query', $query, Type::STRING);
 
-        Argument::validate('Query', $query, Argument::STRING);
-
-        $new = clone $this;
-        $new->query = $query;
-        return $new;
+        return $this->getQuery() === $query ? $this : (clone $this)->setQuery($query);
     }
 
     /**
-     * @inheritDoc
+     * 返回具有指定片段的实例
+     *
+     * @param string $fragment
+     * @return static
      */
-    public function withFragment($fragment)
+    public function withFragment($fragment): self
     {
-        if ($this->getFragment() === $fragment) {
-            return $this;
-        }
+        Type::validate('Fragment', $fragment, Type::STRING);
 
-        Argument::validate('Fragment', $fragment, Argument::STRING);
-
-        $new = clone $this;
-        $new->fragment = $fragment;
-        return $new;
+        return $this->getFragment() === $fragment ? $this : (clone $this)->setFragment($fragment);
     }
 
     /**
-     * @inheritDoc
+     * 字符串化
+     *
+     * @return string
      */
     public function __toString(): string
     {
         $url = '';
 
-        $scheme = $this->getScheme();
-        if ($scheme !== '') {
+        if ('' !== $scheme = $this->getScheme()) {
             $url .= $scheme . ':';
         }
 
@@ -296,8 +297,7 @@ class Uri implements UriInterface
 
         $url .= $this->getPath();
 
-        $query = $this->getQuery();
-        if ($query !== '') {
+        if ('' !== $query = $this->getQuery()) {
             $url .= '?' . $query;
         }
 
@@ -310,40 +310,19 @@ class Uri implements UriInterface
     }
 
     /**
-     * 获取组件值
-     *
-     * @param string $name
-     * @param mixed|null $default
-     * @return mixed|null
-     */
-    protected function getComponent(string $name, $default = null)
-    {
-        if (isset($this->components[$name])) {
-            $component = $this->components[$name];
-            unset($this->components[$name]);
-            return $component;
-        }
-        return $default;
-    }
-
-    /**
-     * 更新授权信息
-     */
-    protected function setAuthority()
-    {
-        $this->authority = self::makeAuthority($this->getUserInfo(), $this->getHost(), $this->getPort());
-    }
-
-    /**
      * 生成用户信息
      *
      * @param string $user
      * @param string|null $pass
      * @return string
      */
-    protected static function makeUserInfo(string $user, ?string $pass): string
+    private static function makeUserInfo(string $user, ?string $pass): string
     {
-        return $user ? $pass ? $user . ':' . $pass : $user : '';
+        return $user
+            ? $pass
+                ? $user . ':' . $pass
+                : $user
+            : '';
     }
 
     /**
@@ -354,7 +333,7 @@ class Uri implements UriInterface
      * @param int|null $port
      * @return string
      */
-    protected static function makeAuthority(string $userInfo, string $host, ?int $port): string
+    private static function makeAuthority(string $userInfo, string $host, ?int $port): string
     {
         $authority = '';
 
@@ -369,5 +348,104 @@ class Uri implements UriInterface
         }
 
         return $authority;
+    }
+
+    /**
+     * 获取指定组件
+     *
+     * @param string $name
+     * @param mixed|null $default
+     * @return mixed|null
+     */
+    private function getComponent(string $name, $default = null)
+    {
+        return $this->components[$name] ?? $default;
+    }
+
+    /**
+     * 设置方案组件
+     *
+     * @param string $scheme
+     * @return $this
+     */
+    private function setScheme(string $scheme): self
+    {
+        $this->scheme = $scheme;
+        return $this;
+    }
+
+    /**
+     * 设置用户信息组件
+     *
+     * @param string $userInfo
+     * @return $this
+     */
+    private function setUserInfo(string $userInfo): self
+    {
+        $this->userInfo = $userInfo;
+        $this->authority = null;
+        return $this;
+    }
+
+    /**
+     * 设置主机组件
+     *
+     * @param string $host
+     * @return $this
+     */
+    private function setHost(string $host): self
+    {
+        $this->host = $host;
+        $this->authority = null;
+        return $this;
+    }
+
+    /**
+     * 设置端口组件
+     *
+     * @param string|null $port
+     * @return $this
+     */
+    private function setPort(?string $port): self
+    {
+        $this->port = $port;
+        $this->authority = null;
+        return $this;
+    }
+
+    /**
+     * 设置路径组件
+     *
+     * @param string $path
+     * @return $this
+     */
+    private function setPath(string $path): self
+    {
+        $this->path = $path;
+        return $this;
+    }
+
+    /**
+     * 设置查询字符串
+     *
+     * @param string $query
+     * @return $this
+     */
+    private function setQuery(string $query): self
+    {
+        $this->query = $query;
+        return $this;
+    }
+
+    /**
+     * 设置片段组件
+     *
+     * @param string $fragment
+     * @return $this
+     */
+    private function setFragment(string $fragment): self
+    {
+        $this->fragment = $fragment;
+        return $this;
     }
 }

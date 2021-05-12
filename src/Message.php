@@ -1,32 +1,25 @@
 <?php
 
-declare(strict_types=1);
-
 namespace chaser\http\message;
 
+use chaser\utils\validation\Type;
 use InvalidArgumentException;
+use Psr\Http\Message\MessageInterface;
 use Psr\Http\Message\StreamInterface;
 
 /**
- * 消息特征
+ * http 消息类
  *
  * @package chaser\http\message
  */
-trait Message
+class Message implements MessageInterface
 {
     /**
-     * HTTP 协议版本
+     * 协议版本
      *
      * @var string
      */
     private string $protocolVersion = '1.1';
-
-    /**
-     * 虚（纯小写）实消息头名称对照表
-     *
-     * @var array
-     */
-    private array $headerNames = [];
 
     /**
      * 消息头数组
@@ -34,6 +27,13 @@ trait Message
      * @var string[][]
      */
     private array $headers = [];
+
+    /**
+     * 消息头虚（纯小写）实名称对照表
+     *
+     * @var array
+     */
+    private array $headerNames = [];
 
     /**
      * 消息体流
@@ -58,15 +58,27 @@ trait Message
      * @param string $version
      * @return static
      */
-    public function withProtocolVersion($version)
+    public function withProtocolVersion($version): self
     {
-        return $this->protocolVersion === $version ? $this : (clone $this)->setProtocolVersion($version);
+        return $this->getProtocolVersion() === $version ? $this : (clone $this)->setProtocolVersion($version);
     }
 
     /**
-     * 返回消息头数组
+     * 检索所有消息头值
      *
-     * @return array
+     *     // 将标题表示为字符串
+     *     foreach ($message->getHeaders() as $name => $values) {
+     *         echo $name . ": " . implode(", ", $values);
+     *     }
+     *
+     *     // 以迭代方式发出标头
+     *     foreach ($message->getHeaders() as $name => $values) {
+     *         foreach ($values as $value) {
+     *             header(sprintf('%s: %s', $name, $value), false);
+     *         }
+     *     }
+     *
+     * @return string[][]
      */
     public function getHeaders(): array
     {
@@ -74,7 +86,7 @@ trait Message
     }
 
     /**
-     * 返回是否存在指定（不区分大小写）名称的消息头
+     * 检查给定名称（不区分大小写）是否存在消息头
      *
      * @param string $name
      * @return bool
@@ -85,24 +97,22 @@ trait Message
     }
 
     /**
-     * 返回指定（不区分大小写）名称的消息头
+     * 检索给定名称（不区分大小写）的消息头值
      *
      * @param string $name
-     * @return array
+     * @return string[]
      */
     public function getHeader($name): array
     {
-        $name = strtolower($name);
-
-        if (null === $saveName = $this->getHeaderNameByLowCaseName($name)) {
+        if (null === $headerName = $this->getHeaderNameByLowCaseName(strtolower($name))) {
             return [];
         }
 
-        return $this->headers[$saveName];
+        return $this->headerNames[$headerName];
     }
 
     /**
-     * 返回指定（不区分大小写）名称的消息头（逗号分隔）字符串
+     * 检索给定名称（不区分大小写）的消息头值（逗号分隔字符串）
      *
      * @param string $name
      * @return string
@@ -118,10 +128,11 @@ trait Message
      * @param string $name
      * @param string|string[] $value
      * @return static
+     * @throws InvalidArgumentException
      */
-    public function withHeader($name, $value)
+    public function withHeader($name, $value): self
     {
-        Argument::validate('Header name', $name, Argument::STRING);
+        Type::validate('Header name', $value, Type::STRING);
 
         return (clone $this)->setHeader($name, $value);
     }
@@ -132,10 +143,11 @@ trait Message
      * @param string $name
      * @param string|string[] $value
      * @return static
+     * @throws InvalidArgumentException
      */
-    public function withAddedHeader($name, $value)
+    public function withAddedHeader($name, $value): self
     {
-        Argument::validate('Header name', $name, Argument::STRING);
+        Type::validate('Header name', $name, Type::STRING);
 
         return (clone $this)->addHeader($name, $value);
     }
@@ -145,14 +157,19 @@ trait Message
      *
      * @param string $name
      * @return static
+     * @throws InvalidArgumentException
      */
-    public function withoutHeader($name)
+    public function withoutHeader($name): self
     {
-        Argument::validate('Header name', $name, Argument::STRING);
+        Type::validate('Header name', $name, Type::STRING);
 
         $lowCaseName = strtolower($name);
 
-        return isset($this->headerNames[$lowCaseName]) ? (clone $this)->delHeaderByLowCaseName($lowCaseName) : $this;
+        if (null === $headerName = $this->getHeaderNameByLowCaseName($lowCaseName)) {
+            return $this;
+        }
+
+        return (clone $this)->delHeader($lowCaseName, $headerName);
     }
 
     /**
@@ -170,33 +187,23 @@ trait Message
      *
      * @param StreamInterface $body
      * @return static
+     * @throws InvalidArgumentException
      */
-    public function withBody(StreamInterface $body)
+    public function withBody(StreamInterface $body): self
     {
         return $this->getBody() === $body ? $this : (clone $this)->setBody($body);
     }
 
     /**
-     * 修改 HTTP 协议版本
+     * 设置 HTTP 协议版本
      *
      * @param string $version
      * @return $this
      */
-    private function setProtocolVersion(string $version): self
+    protected function setProtocolVersion(string $version): self
     {
         $this->protocolVersion = $version;
         return $this;
-    }
-
-    /**
-     * 通过小写名获取当前消息头名
-     *
-     * @param string $name
-     * @return string|null
-     */
-    private function getHeaderNameByLowCaseName(string $name): ?string
-    {
-        return $this->headerNames[$name] ?? null;
     }
 
     /**
@@ -205,11 +212,24 @@ trait Message
      * @param array $headers
      * @return $this
      */
-    private function setHeaders(array $headers): self
+    protected function setHeaders(array $headers): self
     {
-        array_walk($headers, function ($value, $name) {
+        foreach ($headers as $name => $value) {
             $this->setHeader($name, $value);
-        });
+        }
+
+        return $this;
+    }
+
+    /**
+     * 修改消息体
+     *
+     * @param StreamInterface $body
+     * @return $this
+     */
+    protected function setBody(StreamInterface $body): self
+    {
+        $this->body = $body;
         return $this;
     }
 
@@ -220,16 +240,15 @@ trait Message
      * @param string|string[] $value
      * @return $this
      */
-    private function setHeader(string $name, $value): self
+    protected function setHeader(string $name, $value): self
     {
         $value = self::normalizeHeaderValue($value);
 
         $lowCaseName = strtolower($name);
 
-        $saveName = $this->getHeaderNameByLowCaseName($lowCaseName);
-
-        if ($saveName !== $name) {
+        if ($name !== $headerName = $this->getHeaderNameByLowCaseName($lowCaseName)) {
             $this->headerNames[$lowCaseName] = $name;
+            unset($this->headers[$headerName]);
         }
 
         $this->headers[$name] = $value;
@@ -250,13 +269,11 @@ trait Message
 
         $lowCaseName = strtolower($name);
 
-        $saveName = $this->getHeaderNameByLowCaseName($lowCaseName);
-
-        if ($saveName === null) {
+        if (null === $headerName = $this->getHeaderNameByLowCaseName($lowCaseName)) {
             $this->headerNames[$lowCaseName] = $name;
             $this->headers[$name] = $value;
         } else {
-            $this->headers[$name] = array_merge($this->headers[$saveName], $value);
+            $this->headers[$headerName] = array_merge($this->headers[$headerName], $value);
         }
 
         return $this;
@@ -265,28 +282,25 @@ trait Message
     /**
      * 通过小写名删除消息头
      *
-     * @param string $name
+     * @param string $lowCaseName
+     * @param string $headerName
      * @return $this
      */
-    private function delHeaderByLowCaseName(string $name): self
+    private function delHeader(string $lowCaseName, string $headerName): self
     {
-        if (null !== $saveName = $this->getHeaderNameByLowCaseName($name)) {
-            unset($this->headers[$saveName], $this->headerNames[$name]);
-        }
-
+        unset($this->headers[$headerName], $this->headerNames[$lowCaseName]);
         return $this;
     }
 
     /**
-     * 修改消息体
+     * 通过小写名称获取当前消息头名称
      *
-     * @param StreamInterface $body
-     * @return $this
+     * @param string $name
+     * @return string|null
      */
-    private function setBody(StreamInterface $body): self
+    private function getHeaderNameByLowCaseName(string $name): ?string
     {
-        $this->body = $body;
-        return $this;
+        return $this->headerNames[$name] ?? null;
     }
 
     /**
