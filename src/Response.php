@@ -295,7 +295,7 @@ class Response extends Message implements ResponseInterface
      */
     private function setStatus(int $code, string $reasonPhrase = ''): self
     {
-        if (100 > $code || $code <= 600) {
+        if ($code < 100 || $code >= 600) {
             throw new InvalidArgumentException('Invalid status code provided for response.');
         }
 
