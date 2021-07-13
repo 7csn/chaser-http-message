@@ -8,13 +8,14 @@ use InvalidArgumentException;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\UriInterface;
+use Stringable;
 
 /**
  * http 客户端请求类
  *
  * @package chaser\http\message
  */
-class Request extends Message implements RequestInterface
+class Request extends Message implements RequestInterface, Stringable
 {
     /**
      * 可用请求方法

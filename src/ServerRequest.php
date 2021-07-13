@@ -2,6 +2,7 @@
 
 namespace chaser\http\message;
 
+use chaser\utils\validation\Type;
 use InvalidArgumentException;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamInterface;
@@ -180,7 +181,7 @@ class ServerRequest extends Request implements ServerRequestInterface
     {
         foreach ($uploadedFiles as $file) {
             if (!$file instanceof UploadedFileInterface) {
-                throw Argument::exception('UploadedFiles', 'an array of UploadedFileInterface instances');
+                throw Type::exception('UploadedFiles', 'an array of UploadedFileInterface instances');
             }
         }
 
@@ -222,7 +223,7 @@ class ServerRequest extends Request implements ServerRequestInterface
      */
     public function withParsedBody($data): self
     {
-        Argument::validate('Parsed body', $data, Argument::NULL | Argument::ARRAY | Argument::OBJECT);
+        Type::validate('Parsed body', $data, Type::NULL | Type::ARRAY | Type::OBJECT);
 
         if ($this->parseBody === $data) {
             return $this;
@@ -286,7 +287,7 @@ class ServerRequest extends Request implements ServerRequestInterface
     }
 
     /**
-     *
+     * 返回删除指定派生请求属性的实例
      *
      * 返回一个实例，该实例删除指定的派生请求属性。
      *
